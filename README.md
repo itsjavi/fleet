@@ -4,6 +4,9 @@ Fleet is a local‑first desktop dashboard builder. Organize your work into Proj
 and lay out Widgets on a responsive grid. Widgets are draggable and resizable (via dnd‑kit) and all changes persist to a
 local SQLite database through the official Tauri SQL plugin.
 
+<img width="960" height="640" alt="image" src="https://github.com/user-attachments/assets/231fe0d0-09bc-4c53-bbed-016c197f2d66" />
+
+
 ## Features
 
 - Projects, dashboard tabs, and grid‑based widgets
