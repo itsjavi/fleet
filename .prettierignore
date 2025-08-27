@@ -1,0 +1,22 @@
+# Ignore:
+build/
+dist/
+.next/
+.turbo/
+node_modules/
+coverage/
+.vercel/
+.react-router/
+
+package.json
+pnpm-*.yaml
+*.min.json
+
+.ignore/
+.local/
+.dev/
+
+public/
+drizzle/
+src-tauri/
+
