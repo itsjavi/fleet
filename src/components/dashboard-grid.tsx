@@ -3,15 +3,17 @@ import {
   AlertDialogAction,
   AlertDialogCancel,
   AlertDialogContent,
+  AlertDialogDescription,
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
 import { buildOccupancy, firstFit, isRectFree } from '@/lib/grid-occupancy'
+import { DashboardsRepository } from '@/lib/repositories/dashboards-repository'
 import { WidgetsRepository } from '@/lib/repositories/widgets-repository'
 import type { Widget } from '@/lib/types'
 import { cn } from '@/lib/utils'
@@ -29,12 +31,21 @@ const ROWS = 24
 export type DashboardGridProps = {
   dashboardId: string
   layoutMode?: boolean
+  onDashboardRenamed?: () => void
+  onDashboardDeleted?: () => void
 }
 
-export function DashboardGrid({ dashboardId, layoutMode = false }: DashboardGridProps) {
+export function DashboardGrid({
+  dashboardId,
+  layoutMode = false,
+  onDashboardRenamed,
+  onDashboardDeleted,
+}: DashboardGridProps) {
   const repo = new WidgetsRepository()
+  const dashboardsRepo = new DashboardsRepository()
   const [widgets, setWidgets] = useState<Widget[]>([])
   const [open, setOpen] = useState(false)
+  const [renameDashboardOpen, setRenameDashboardOpen] = useState(false)
   const [title, setTitle] = useState('New widget')
   // layoutMode is controlled by parent (toolbar toggle)
 
@@ -48,12 +59,25 @@ export function DashboardGrid({ dashboardId, layoutMode = false }: DashboardGrid
     row_count: number
   } | null>(null)
 
+  // dashboard meta state
+  const [dashboardTitle, setDashboardTitle] = useState('')
+  const [deleteDashboardOpen, setDeleteDashboardOpen] = useState(false)
+  const [savingDashboardTitle, setSavingDashboardTitle] = useState(false)
+
+  // widget rename dialog state
+  const [renameWidgetOpen, setRenameWidgetOpen] = useState(false)
+  const [renameWidgetId, setRenameWidgetId] = useState<string>('')
+  const [renameWidgetValue, setRenameWidgetValue] = useState('')
+
   useEffect(() => {
     if (!dashboardId) {
       setWidgets([])
+      setDashboardTitle('')
       return
     }
     ;(async () => {
+      const d = await dashboardsRepo.getById(dashboardId)
+      setDashboardTitle(d?.title ?? '')
       const list = await repo.listByDashboard(dashboardId)
       setWidgets(list)
     })()
@@ -187,35 +211,49 @@ export function DashboardGrid({ dashboardId, layoutMode = false }: DashboardGrid
     await repo.updatePositionAndSize(id, candidate)
   }
 
-  async function nudgeSelected(dxCells: number, dyCells: number) {
-    if (!selectedId) return
-    const current = widgets.find((w) => w.id === selectedId)
-    if (!current) return
-    const newColStart = Math.max(1, Math.min(COLS - current.col_count + 1, current.col_start + dxCells))
-    const newRowStart = Math.max(1, Math.min(ROWS - current.row_count + 1, current.row_start + dyCells))
-    const candidate = {
-      id: selectedId,
-      col_start: newColStart,
-      row_start: newRowStart,
-      col_count: current.col_count,
-      row_count: current.row_count,
-    }
-    const grid = buildOccupancy(
-      widgets.filter((w) => w.id !== selectedId),
-      COLS,
-    )
-    if (!isRectFree(grid, COLS, candidate)) return
-    setWidgets((ws) =>
-      ws.map((w) => (w.id === selectedId ? { ...w, col_start: newColStart, row_start: newRowStart } : w)),
-    )
-    await repo.updatePositionAndSize(selectedId, candidate)
+  function openRenameWidget(id: string) {
+    const w = widgets.find((x) => x.id === id)
+    setRenameWidgetId(id)
+    setRenameWidgetValue(w?.title ?? '')
+    setRenameWidgetOpen(true)
   }
 
-  async function renameWidget(id: string) {
-    const name = prompt('New widget title?')?.trim()
-    if (!name) return
-    await repo.rename(id, name)
-    setWidgets((ws) => ws.map((w) => (w.id === id ? { ...w, title: name } : w)))
+  async function commitRenameWidget() {
+    const trimmed = renameWidgetValue.trim()
+    if (!renameWidgetId || !trimmed) {
+      setRenameWidgetOpen(false)
+      setRenameWidgetId('')
+      setRenameWidgetValue('')
+      return
+    }
+    await repo.rename(renameWidgetId, trimmed)
+    setWidgets((ws) => ws.map((w) => (w.id === renameWidgetId ? { ...w, title: trimmed } : w)))
+    setRenameWidgetOpen(false)
+    setRenameWidgetId('')
+    setRenameWidgetValue('')
+  }
+
+  async function commitDashboardRename() {
+    const trimmed = dashboardTitle.trim()
+    if (!trimmed || !dashboardId) return
+    try {
+      setSavingDashboardTitle(true)
+      await dashboardsRepo.rename(dashboardId, trimmed)
+      onDashboardRenamed?.()
+    } finally {
+      setSavingDashboardTitle(false)
+    }
+  }
+
+  async function confirmDeleteDashboard() {
+    setDeleteDashboardOpen(true)
+  }
+
+  async function doDeleteDashboard() {
+    if (!dashboardId) return
+    await dashboardsRepo.delete(dashboardId)
+    setDeleteDashboardOpen(false)
+    onDashboardDeleted?.()
   }
 
   function confirmDelete(id: string) {
@@ -282,7 +320,7 @@ export function DashboardGrid({ dashboardId, layoutMode = false }: DashboardGrid
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
                   <DropdownMenuItem onClick={onRename}>Rename</DropdownMenuItem>
-                  <DropdownMenuItem onClick={onDelete} className="text-red-600">
+                  <DropdownMenuItem onClick={onDelete} className="text-destructive">
                     Delete
                   </DropdownMenuItem>
                 </DropdownMenuContent>
@@ -364,26 +402,73 @@ export function DashboardGrid({ dashboardId, layoutMode = false }: DashboardGrid
 
   return (
     <div className="flex h-full flex-col gap-3">
+      <Dialog open={renameDashboardOpen} onOpenChange={setRenameDashboardOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Rename dashboard</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Input
+              value={dashboardTitle}
+              onChange={(e) => setDashboardTitle(e.currentTarget.value)}
+              placeholder="Dashboard name"
+            />
+          </div>
+          <DialogFooter>
+            <Button
+              onClick={() => {
+                commitDashboardRename()
+                  .then(() => {
+                    setRenameDashboardOpen(false)
+                  })
+                  .catch((e) => {
+                    alert(e.message)
+                  })
+              }}
+              disabled={savingDashboardTitle || !dashboardTitle.trim()}
+            >
+              Save
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add widget</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Input value={title} onChange={(e) => setTitle(e.currentTarget.value)} placeholder="Title" />
+          </div>
+          <DialogFooter>
+            <Button onClick={addWidget}>Create</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       {layoutMode && (
         <div className="flex items-center justify-between">
-          <div className="text-xs text-neutral-500">Edit mode: drag to move, use handle to resize.</div>
           <div className="flex items-center gap-2">
-            <Dialog open={open} onOpenChange={setOpen}>
-              <DialogTrigger asChild>
-                <Button size="sm">Add widget</Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Add widget</DialogTitle>
-                </DialogHeader>
-                <div className="space-y-2">
-                  <Input value={title} onChange={(e) => setTitle(e.currentTarget.value)} placeholder="Title" />
-                </div>
-                <DialogFooter>
-                  <Button onClick={addWidget}>Create</Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
+            <div className="text-xs text-neutral-500">Edit mode: drag to move, use handle to resize.</div>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button size="sm" onClick={() => setOpen(true)}>
+              Add widget
+            </Button>
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button size="sm" variant="outline" className="shrink-0" aria-label="Open settings">
+                  <SettingsIcon className="h-4 w-4" /> <span className="sr-only">Settings</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => setRenameDashboardOpen(true)}>Rename dashboard</DropdownMenuItem>
+                <DropdownMenuItem onClick={confirmDeleteDashboard} className="text-destructive" disabled={!dashboardId}>
+                  Delete dashboard
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
       )}
@@ -393,6 +478,9 @@ export function DashboardGrid({ dashboardId, layoutMode = false }: DashboardGrid
           <div className="flex flex-col items-center justify-center gap-2 text-center text-muted-foreground">
             <PackageOpen className="h-8 w-8" />
             <div className="text-sm">This dashboard has no widgets yet</div>
+            <Button onClick={() => setOpen(true)} variant="outline" size="sm" className="mt-2">
+              Add widget
+            </Button>
           </div>
         </div>
       ) : (
@@ -402,30 +490,7 @@ export function DashboardGrid({ dashboardId, layoutMode = false }: DashboardGrid
           onDragMove={handleDragMoveEvent}
           onDragEnd={handleDragEnd}
         >
-          <div
-            className="grid gap-2"
-            style={{ ...gridStyle, height: `${ROWS * CELL_PX}px` }}
-            onKeyDown={(e) => {
-              if (!layoutMode) return
-              if (e.key === 'ArrowLeft') {
-                e.preventDefault()
-                nudgeSelected(-1, 0)
-              } else if (e.key === 'ArrowRight') {
-                e.preventDefault()
-                nudgeSelected(1, 0)
-              } else if (e.key === 'ArrowUp') {
-                e.preventDefault()
-                nudgeSelected(0, -1)
-              } else if (e.key === 'ArrowDown') {
-                e.preventDefault()
-                nudgeSelected(0, 1)
-              } else if (e.key === 'Escape') {
-                e.preventDefault()
-                e.currentTarget.blur()
-              }
-            }}
-            tabIndex={layoutMode ? 0 : undefined}
-          >
+          <div className="grid gap-2" style={{ ...gridStyle, height: `${ROWS * CELL_PX}px` }}>
             {widgets.map((w) => (
               <WidgetCard
                 key={w.id}
@@ -434,7 +499,7 @@ export function DashboardGrid({ dashboardId, layoutMode = false }: DashboardGrid
                 selected={selectedId === w.id}
                 onSelect={() => setSelectedId(w.id)}
                 onResize={(dx, dy) => resizeWidget(w.id, dx, dy)}
-                onRename={() => renameWidget(w.id)}
+                onRename={() => openRenameWidget(w.id)}
                 onDelete={() => confirmDelete(w.id)}
               />
             ))}
@@ -458,12 +523,58 @@ export function DashboardGrid({ dashboardId, layoutMode = false }: DashboardGrid
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction className="bg-red-600 hover:bg-red-700" onClick={doDelete}>
+            <AlertDialogAction className="bg-destructive hover:bg-red-600" onClick={doDelete}>
               Delete
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Delete dashboard confirmation */}
+      <AlertDialog open={deleteDashboardOpen} onOpenChange={setDeleteDashboardOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete dashboard?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will remove the dashboard and its widgets. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction className="bg-destructive hover:bg-red-600" onClick={doDeleteDashboard}>
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Rename widget dialog */}
+      <Dialog open={renameWidgetOpen} onOpenChange={setRenameWidgetOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Rename widget</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Input
+              value={renameWidgetValue}
+              onChange={(e) => setRenameWidgetValue(e.currentTarget.value)}
+              placeholder="Widget name"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') commitRenameWidget()
+              }}
+              autoFocus
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRenameWidgetOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={commitRenameWidget} disabled={!renameWidgetValue.trim()}>
+              Save
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

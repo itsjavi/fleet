@@ -24,17 +24,27 @@ function App() {
         layoutMode={layoutMode}
         onToggleLayout={() => setLayoutMode((v) => !v)}
       />
-      <div className="flex-1 p-4">
+      <div className="flex-1 p-2">
         {isEmpty ? (
-          <Welcome
-            onCreated={(pid, did) => {
-              setProjectId(pid)
-              setDashboardId(did)
+          <div className="flex h-full flex-col items-center justify-center gap-2 text-center text-muted-foreground">
+            <Welcome
+              onCreated={(pid, did) => {
+                setProjectId(pid)
+                setDashboardId(did)
+                setRefresh((r) => r + 1)
+              }}
+            />
+          </div>
+        ) : dashboardId ? (
+          <DashboardGrid
+            dashboardId={dashboardId}
+            layoutMode={layoutMode}
+            onDashboardRenamed={() => setRefresh((r) => r + 1)}
+            onDashboardDeleted={() => {
+              setDashboardId('')
               setRefresh((r) => r + 1)
             }}
           />
-        ) : dashboardId ? (
-          <DashboardGrid dashboardId={dashboardId} layoutMode={layoutMode} />
         ) : (
           <div className="flex h-full flex-col items-center justify-center gap-2 text-center text-muted-foreground">
             <LayoutDashboard className="h-8 w-8" />

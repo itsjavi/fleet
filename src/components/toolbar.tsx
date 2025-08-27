@@ -16,9 +16,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { DashboardsRepository } from '@/lib/repositories/dashboards-repository'
 import { ProjectsRepository } from '@/lib/repositories/projects-repository'
+import { ProjectService } from '@/lib/services/project-service'
 import type { Dashboard, Project } from '@/lib/types'
 import { cn } from '@/lib/utils'
-import { LayoutDashboard, MoreVerticalIcon, Plus, Settings } from 'lucide-react'
+import { LayoutDashboardIcon, Plus, Settings } from 'lucide-react'
 import { nanoid } from 'nanoid'
 import { useEffect, useState } from 'react'
 
@@ -33,6 +34,7 @@ export type ToolbarProps = {
 }
 
 export function Toolbar(props: ToolbarProps) {
+  const service = new ProjectService()
   const {
     onProjectChange,
     onDashboardChange,
@@ -68,11 +70,6 @@ export function Toolbar(props: ToolbarProps) {
   const [renamingProject, setRenamingProject] = useState(false)
 
   const [deleteProjectOpen, setDeleteProjectOpen] = useState(false)
-
-  // Inline rename for dashboards
-  const [renamingDashboardId, setRenamingDashboardId] = useState<string>('')
-  const [renameDashboardValue, setRenameDashboardValue] = useState('')
-  const [savingDashboardRename, setSavingDashboardRename] = useState(false)
 
   useEffect(() => {
     ;(async () => {
@@ -134,41 +131,6 @@ export function Toolbar(props: ToolbarProps) {
     }
   }
 
-  function beginRenameDashboard(id: string, currentTitle: string) {
-    setRenamingDashboardId(id)
-    setRenameDashboardValue(currentTitle)
-  }
-
-  async function commitRenameDashboard() {
-    if (!renamingDashboardId) return
-    const title = renameDashboardValue.trim()
-    if (!title) {
-      setRenamingDashboardId('')
-      setRenameDashboardValue('')
-      return
-    }
-    try {
-      setSavingDashboardRename(true)
-      await dashboardsRepo.rename(renamingDashboardId, title)
-      const list = await dashboardsRepo.listByProject(projectId)
-      setDashboards(list)
-    } finally {
-      setSavingDashboardRename(false)
-      setRenamingDashboardId('')
-      setRenameDashboardValue('')
-    }
-  }
-
-  function cancelRenameDashboard() {
-    setRenamingDashboardId('')
-    setRenameDashboardValue('')
-  }
-
-  function confirmDelete(id: string) {
-    setPendingDeleteId(id)
-    setConfirmOpen(true)
-  }
-
   async function doDelete() {
     if (!pendingDeleteId) return
     await dashboardsRepo.delete(pendingDeleteId)
@@ -184,11 +146,10 @@ export function Toolbar(props: ToolbarProps) {
     if (!title) return
     try {
       setSavingProject(true)
-      const p: Project = { id: nanoid(), title }
-      await projectsRepo.create(p)
+      const { project } = await service.createProjectWithDefaultDashboard({ id: nanoid(), title }, 'Dashboard 1')
       const list = await projectsRepo.list()
       setProjects(list)
-      setProjectId(p.id)
+      setProjectId(project.id)
       setAddProjectOpen(false)
       setNewProjectName('')
     } finally {
@@ -221,65 +182,76 @@ export function Toolbar(props: ToolbarProps) {
     setDeleteProjectOpen(false)
   }
 
+  if (projects.length === 0) {
+    return null
+  }
+
   return (
     <div className="flex items-center gap-3 border-b px-3 py-2">
-      <Select value={projectId} onValueChange={(v) => setProjectId(v)}>
-        <SelectTrigger className="w-56">
-          <SelectValue placeholder="Select project" />
-        </SelectTrigger>
-        <SelectContent>
-          {projects.map((p) => (
-            <SelectItem key={p.id} value={p.id}>
-              {p.title}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+      {projects.length > 1 && (
+        <Select value={projectId} onValueChange={(v) => setProjectId(v)}>
+          <SelectTrigger className="w-56">
+            <SelectValue placeholder="Select project" />
+          </SelectTrigger>
+          <SelectContent>
+            {projects.map((p) => (
+              <SelectItem key={p.id} value={p.id}>
+                {p.title}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      )}
 
       <Tabs value={dashboardId} onValueChange={setDashboardId} className="flex-1 ">
-        <TabsList className="flex bg-transparent justify-start w-full items-center gap-2 overflow-x-auto whitespace-nowrap rounded-lg p-1">
+        <TabsList
+          className={cn(
+            'flex bg-transparent justify-start w-full items-center gap-2 whitespace-nowrap rounded-lg p-1',
+            'max-w-full overflow-x-auto',
+          )}
+        >
           {dashboards.map((d) => (
             <div key={d.id} className="inline-flex items-stretch">
               <TabsTrigger
                 value={d.id}
                 className={cn(
-                  'pl-4 rounded-lg border-none text-sm',
-                  'data-[state=active]:bg-neutral-400 dark:data-[state=active]:bg-neutral-800',
-                  'data-[state=active]:text-neutral-900 dark:data-[state=active]:text-neutral-100',
+                  'rounded-lg border-none text-sm flex',
+                  'active-state:bg-neutral-400 dark:active-state:bg-neutral-800',
+                  'active-state:text-neutral-900 dark:active-state:text-neutral-100',
                   'hover:bg-neutral-200 dark:hover:bg-neutral-900',
                 )}
-                onDoubleClick={() => beginRenameDashboard(d.id, d.title)}
               >
-                <div className="flex gap-6 items-center justify-between overflow-hidden">
+                <div className="py-2 px-4 flex gap-6 items-center justify-between overflow-hidden">
                   <div className="flex-1">{d.title}</div>
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    className="h-9 w-8 shrink-0 rounded-none text-muted-foreground hover:bg-accent"
-                    aria-label="Close tab"
-                    onClick={() => confirmDelete(d.id)}
-                  >
-                    <MoreVerticalIcon className="h-4 w-4" />
-                  </Button>
                 </div>
               </TabsTrigger>
             </div>
           ))}
-          <div className="mx-1 h-5 w-px shrink-0 bg-border" />
-          <Button
-            size="icon"
-            variant="ghost"
-            className="ml-1 h-7 w-7 shrink-0"
-            aria-label="Add dashboard"
-            onClick={() => setAddDashboardOpen(true)}
-          >
-            <Plus className="h-4 w-4" />
-          </Button>
+          {layoutMode && (
+            <>
+              <div className="mx-1 h-5 w-px shrink-0 bg-border" />
+              <Button
+                size="icon"
+                variant="ghost"
+                className="ml-1 h-7 w-7 shrink-0"
+                aria-label="Add dashboard"
+                onClick={() => setAddDashboardOpen(true)}
+              >
+                <Plus className="h-4 w-4" />
+              </Button>
+            </>
+          )}
         </TabsList>
       </Tabs>
 
-      <Button size="sm" variant={layoutMode ? 'default' : 'outline'} onClick={onToggleLayout} className="shrink-0">
-        {layoutMode ? 'Done' : <LayoutDashboard className="h-4 w-4" />}
+      <Button
+        title={layoutMode ? 'Exit dashboard editor' : 'Edit dashboard'}
+        size="sm"
+        variant={layoutMode ? 'default' : 'outline'}
+        onClick={onToggleLayout}
+        className="shrink-0"
+      >
+        <LayoutDashboardIcon className="h-4 w-4" />
       </Button>
 
       <DropdownMenu>
@@ -289,6 +261,7 @@ export function Toolbar(props: ToolbarProps) {
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
+          {/* <DropdownMenuSeparator /> */}
           <DropdownMenuItem onClick={() => setAddProjectOpen(true)}>Add project</DropdownMenuItem>
           <DropdownMenuItem
             onClick={() => {
@@ -299,7 +272,11 @@ export function Toolbar(props: ToolbarProps) {
           >
             Rename project
           </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => setDeleteProjectOpen(true)} className="text-red-600" disabled={!projectId}>
+          <DropdownMenuItem
+            onClick={() => setDeleteProjectOpen(true)}
+            className="text-destructive"
+            disabled={!projectId}
+          >
             Delete project
           </DropdownMenuItem>
         </DropdownMenuContent>
@@ -410,7 +387,7 @@ export function Toolbar(props: ToolbarProps) {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction className="bg-red-600 hover:bg-red-700" onClick={doDelete}>
+            <AlertDialogAction className="bg-destructive hover:bg-red-600" onClick={doDelete}>
               Delete
             </AlertDialogAction>
           </AlertDialogFooter>
@@ -429,7 +406,7 @@ export function Toolbar(props: ToolbarProps) {
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
-              className="bg-red-600 hover:bg-red-700"
+              className="bg-destructive hover:bg-red-600"
               onClick={() => {
                 submitDeleteProject()
               }}

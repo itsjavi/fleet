@@ -18,7 +18,7 @@ export function Welcome({ onCreated }: WelcomeProps) {
     setBusy(true)
     try {
       const project: Project = { id: nanoid(), title }
-      const { project: p, dashboard } = await service.createProjectWithDefaultDashboard(project, 'Main')
+      const { project: p, dashboard } = await service.createProjectWithDefaultDashboard(project, 'Dashboard 1')
       onCreated?.(p.id, dashboard.id)
     } finally {
       setBusy(false)
@@ -27,6 +27,9 @@ export function Welcome({ onCreated }: WelcomeProps) {
 
   return (
     <div className="mx-auto mt-24 max-w-lg rounded-lg border p-6">
+      <div className="flex items-center justify-center gap-2 mb-4">
+        <img src="/icon.webp" alt="Fleet" className="h-20 w-20" />
+      </div>
       <h2 className="mb-2 text-xl font-semibold">Welcome to Fleet</h2>
       <p className="mb-4 text-sm text-neutral-500">
         Create your first project to get started. We'll also create a default dashboard for you.

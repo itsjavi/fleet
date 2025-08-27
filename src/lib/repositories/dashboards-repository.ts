@@ -2,6 +2,11 @@ import { getDb } from '../db'
 import type { Dashboard } from '../types'
 
 export class DashboardsRepository {
+  async getById(id: string): Promise<Dashboard | null> {
+    const db = await getDb()
+    const rows = await db.select<Dashboard[]>(`SELECT id, project_id, title FROM dashboards WHERE id = $1`, [id])
+    return rows[0] ?? null
+  }
   async listByProject(projectId: string): Promise<Dashboard[]> {
     const db = await getDb()
     return db.select<Dashboard[]>(
