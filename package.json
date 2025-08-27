@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "build": "tsc && vite build",
+    "build:icon": "bun tauri icon public/icon.webp",
     "dev": "vite",
     "devv": "tauri dev",
     "format": "prettier --write *.md *.ts ./src && sort-package-json",
