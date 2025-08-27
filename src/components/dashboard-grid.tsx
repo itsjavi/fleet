@@ -18,7 +18,7 @@ import { cn } from '@/lib/utils'
 import { DndContext, DragEndEvent, DragMoveEvent, DragStartEvent, useDraggable } from '@dnd-kit/core'
 import { restrictToParentElement } from '@dnd-kit/modifiers'
 import { CSS } from '@dnd-kit/utilities'
-import { GripVertical, SettingsIcon } from 'lucide-react'
+import { GripVertical, PackageOpen, SettingsIcon } from 'lucide-react'
 import { nanoid } from 'nanoid'
 import { useEffect, useMemo, useState } from 'react'
 
@@ -388,59 +388,68 @@ export function DashboardGrid({ dashboardId, layoutMode = false }: DashboardGrid
         </div>
       )}
 
-      <DndContext
-        modifiers={layoutMode ? [restrictToParentElement] : []}
-        onDragStart={handleDragStartEvent}
-        onDragMove={handleDragMoveEvent}
-        onDragEnd={handleDragEnd}
-      >
-        <div
-          className="grid gap-2"
-          style={{ ...gridStyle, height: `${ROWS * CELL_PX}px` }}
-          onKeyDown={(e) => {
-            if (!layoutMode) return
-            if (e.key === 'ArrowLeft') {
-              e.preventDefault()
-              nudgeSelected(-1, 0)
-            } else if (e.key === 'ArrowRight') {
-              e.preventDefault()
-              nudgeSelected(1, 0)
-            } else if (e.key === 'ArrowUp') {
-              e.preventDefault()
-              nudgeSelected(0, -1)
-            } else if (e.key === 'ArrowDown') {
-              e.preventDefault()
-              nudgeSelected(0, 1)
-            } else if (e.key === 'Escape') {
-              e.preventDefault()
-              e.currentTarget.blur()
-            }
-          }}
-          tabIndex={layoutMode ? 0 : undefined}
-        >
-          {widgets.map((w) => (
-            <WidgetCard
-              key={w.id}
-              w={w}
-              layoutMode={layoutMode}
-              selected={selectedId === w.id}
-              onSelect={() => setSelectedId(w.id)}
-              onResize={(dx, dy) => resizeWidget(w.id, dx, dy)}
-              onRename={() => renameWidget(w.id)}
-              onDelete={() => confirmDelete(w.id)}
-            />
-          ))}
-          {layoutMode && preview && (
-            <div
-              className="pointer-events-none rounded border-2 border-dashed border-blue-500/60 bg-blue-500/10"
-              style={{
-                gridColumn: `${preview.col_start} / span ${preview.col_count}`,
-                gridRow: `${preview.row_start} / span ${preview.row_count}`,
-              }}
-            />
-          )}
+      {widgets.length === 0 ? (
+        <div className="flex flex-1 items-center justify-center" style={{ height: `${ROWS * CELL_PX}px` }}>
+          <div className="flex flex-col items-center justify-center gap-2 text-center text-muted-foreground">
+            <PackageOpen className="h-8 w-8" />
+            <div className="text-sm">This dashboard has no widgets yet</div>
+          </div>
         </div>
-      </DndContext>
+      ) : (
+        <DndContext
+          modifiers={layoutMode ? [restrictToParentElement] : []}
+          onDragStart={handleDragStartEvent}
+          onDragMove={handleDragMoveEvent}
+          onDragEnd={handleDragEnd}
+        >
+          <div
+            className="grid gap-2"
+            style={{ ...gridStyle, height: `${ROWS * CELL_PX}px` }}
+            onKeyDown={(e) => {
+              if (!layoutMode) return
+              if (e.key === 'ArrowLeft') {
+                e.preventDefault()
+                nudgeSelected(-1, 0)
+              } else if (e.key === 'ArrowRight') {
+                e.preventDefault()
+                nudgeSelected(1, 0)
+              } else if (e.key === 'ArrowUp') {
+                e.preventDefault()
+                nudgeSelected(0, -1)
+              } else if (e.key === 'ArrowDown') {
+                e.preventDefault()
+                nudgeSelected(0, 1)
+              } else if (e.key === 'Escape') {
+                e.preventDefault()
+                e.currentTarget.blur()
+              }
+            }}
+            tabIndex={layoutMode ? 0 : undefined}
+          >
+            {widgets.map((w) => (
+              <WidgetCard
+                key={w.id}
+                w={w}
+                layoutMode={layoutMode}
+                selected={selectedId === w.id}
+                onSelect={() => setSelectedId(w.id)}
+                onResize={(dx, dy) => resizeWidget(w.id, dx, dy)}
+                onRename={() => renameWidget(w.id)}
+                onDelete={() => confirmDelete(w.id)}
+              />
+            ))}
+            {layoutMode && preview && (
+              <div
+                className="pointer-events-none rounded border-2 border-dashed border-blue-500/60 bg-blue-500/10"
+                style={{
+                  gridColumn: `${preview.col_start} / span ${preview.col_count}`,
+                  gridRow: `${preview.row_start} / span ${preview.row_count}`,
+                }}
+              />
+            )}
+          </div>
+        </DndContext>
+      )}
 
       <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
         <AlertDialogContent>

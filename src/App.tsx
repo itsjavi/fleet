@@ -1,6 +1,7 @@
 import { DashboardGrid } from '@/components/dashboard-grid'
 import { Toolbar } from '@/components/toolbar'
 import { Welcome } from '@/components/welcome'
+import { LayoutDashboard } from 'lucide-react'
 import { useState } from 'react'
 import './globals.css'
 
@@ -35,7 +36,10 @@ function App() {
         ) : dashboardId ? (
           <DashboardGrid dashboardId={dashboardId} layoutMode={layoutMode} />
         ) : (
-          <div className="text-sm text-neutral-600">Select a project and dashboard</div>
+          <div className="flex h-full flex-col items-center justify-center gap-2 text-center text-muted-foreground">
+            <LayoutDashboard className="h-8 w-8" />
+            <div className="text-sm">This project has no dashboards yet</div>
+          </div>
         )}
       </div>
     </main>

@@ -5,7 +5,7 @@ export class DashboardsRepository {
   async listByProject(projectId: string): Promise<Dashboard[]> {
     const db = await getDb()
     return db.select<Dashboard[]>(
-      `SELECT id, project_id, title FROM dashboards WHERE project_id = $1 ORDER BY title ASC`,
+      `SELECT id, project_id, title FROM dashboards WHERE project_id = $1 ORDER BY rowid ASC`,
       [projectId],
     )
   }
