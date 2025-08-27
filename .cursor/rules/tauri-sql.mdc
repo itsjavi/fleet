@@ -1,0 +1,16 @@
+---
+alwaysApply: false
+description: Tauri SQL plugin usage and permissions
+---
+
+# Tauri SQL Plugin
+
+- Rust plugin setup: [src-tauri/src/lib.rs](mdc:src-tauri/src/lib.rs)
+  - Register migrations and build with `features = ["sqlite"]` in Cargo.toml.
+
+- Permissions: [src-tauri/capabilities/default.json](mdc:src-tauri/capabilities/default.json)
+  - Must include `sql:default` and `sql:allow-execute`.
+
+- Frontend DB:
+  - Load once via `Database.load('sqlite:fleet.db')` in [src/lib/db.ts](mdc:src/lib/db.ts)
+  - Use parameterized queries ($1, $2, ...) for sqlite.

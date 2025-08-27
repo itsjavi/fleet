@@ -1,0 +1,21 @@
+---
+globs: src/**/*.tsx
+description: dnd-kit drag/resize handle policy
+---
+
+# DnD Policy: Handles Only, No Body-Drag
+
+- Use dnd-kit `useDraggable` with a dedicated drag handle:
+  - Attach the draggable node ref to the card container via `setNodeRef`.
+  - Do NOT spread listeners/attributes on the container.
+  - Use `setActivatorNodeRef` on a small Grip icon button to start drag; spread `listeners` on that button.
+  - Ensure the card container keeps `cursor-default`; handle uses `cursor-grab active:cursor-grabbing`.
+
+- Resize handle behavior:
+  - Place a corner button with diagonal-resize cursor.
+  - Call `preventDefault()` and `stopPropagation()` on pointer/mouse/touch start to avoid triggering drag.
+  - Perform resize by listening to window move/up (mouse/touch) events.
+
+- Grid placement:
+  - During drag, compute a preview rect using an occupancy grid; show a dashed overlay.
+  - On drop, clamp within 12×24 grid, validate via occupancy, persist to DB, refresh state.

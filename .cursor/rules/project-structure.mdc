@@ -1,0 +1,29 @@
+---
+alwaysApply: true
+---
+
+# Fleet Project Structure
+
+- Frontend (React + TypeScript + Vite)
+  - App entry: [src/App.tsx](mdc:src/App.tsx)
+  - Global styles (Tailwind v4): [src/globals.css](mdc:src/globals.css)
+  - UI components: [src/components](mdc:src/components)
+    - Toolbar: [src/components/toolbar.tsx](mdc:src/components/toolbar.tsx)
+    - Dashboard grid (dnd/resizing/persist): [src/components/dashboard-grid.tsx](mdc:src/components/dashboard-grid.tsx)
+    - Welcome flow: [src/components/welcome.tsx](mdc:src/components/welcome.tsx)
+  - Utilities: [src/lib/utils.ts](mdc:src/lib/utils.ts) (cn helper)
+  - Data layer
+    - DB loader: [src/lib/db.ts](mdc:src/lib/db.ts)
+    - Types: [src/lib/types.ts](mdc:src/lib/types.ts)
+    - Repositories: [src/lib/repositories](mdc:src/lib/repositories)
+    - Services: [src/lib/services](mdc:src/lib/services)
+    - Grid occupancy: [src/lib/grid-occupancy.ts](mdc:src/lib/grid-occupancy.ts)
+
+- Backend (Tauri v2 + SQL plugin)
+  - Rust entry: [src-tauri/src/lib.rs](mdc:src-tauri/src/lib.rs)
+  - Migrations: [src-tauri/src/migrations/1_init.sql](mdc:src-tauri/src/migrations/1_init.sql)
+  - Capabilities/permissions: [src-tauri/capabilities/default.json](mdc:src-tauri/capabilities/default.json)
+
+- Tooling
+  - Package manager: Bun (e.g., `bun tauri dev`, `bun add <pkg>`)
+  - UI: shadcn/ui; Icons: lucide-react; DnD: dnd-kit
