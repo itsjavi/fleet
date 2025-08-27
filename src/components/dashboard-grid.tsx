@@ -14,10 +14,11 @@ import { Input } from '@/components/ui/input'
 import { buildOccupancy, firstFit, isRectFree } from '@/lib/grid-occupancy'
 import { WidgetsRepository } from '@/lib/repositories/widgets-repository'
 import type { Widget } from '@/lib/types'
+import { cn } from '@/lib/utils'
 import { DndContext, DragEndEvent, DragMoveEvent, DragStartEvent, useDraggable } from '@dnd-kit/core'
 import { restrictToParentElement } from '@dnd-kit/modifiers'
 import { CSS } from '@dnd-kit/utilities'
-import { MoreHorizontal } from 'lucide-react'
+import { GripVertical, SettingsIcon } from 'lucide-react'
 import { nanoid } from 'nanoid'
 import { useEffect, useMemo, useState } from 'react'
 
@@ -27,14 +28,15 @@ const ROWS = 24
 
 export type DashboardGridProps = {
   dashboardId: string
+  layoutMode?: boolean
 }
 
-export function DashboardGrid({ dashboardId }: DashboardGridProps) {
+export function DashboardGrid({ dashboardId, layoutMode = false }: DashboardGridProps) {
   const repo = new WidgetsRepository()
   const [widgets, setWidgets] = useState<Widget[]>([])
   const [open, setOpen] = useState(false)
   const [title, setTitle] = useState('New widget')
-  const [layoutMode, setLayoutMode] = useState(false)
+  // layoutMode is controlled by parent (toolbar toggle)
 
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null)
@@ -117,6 +119,7 @@ export function DashboardGrid({ dashboardId }: DashboardGridProps) {
     if (!id) return
     const current = widgets.find((w) => w.id === id)
     if (!current) return
+
     const dxCells = deltaToCells(event.delta.x)
     const dyCells = deltaToCells(event.delta.y)
     const newColStart = Math.max(1, Math.min(COLS - current.col_count + 1, current.col_start + dxCells))
@@ -238,19 +241,18 @@ export function DashboardGrid({ dashboardId }: DashboardGridProps) {
     onDelete: () => void
   }) {
     const { w, layoutMode, selected, onSelect, onResize, onRename, onDelete } = props
-    const { attributes, listeners, setNodeRef, transform } = useDraggable({ id: w.id, disabled: !layoutMode })
+    const { listeners, setNodeRef, setActivatorNodeRef, transform } = useDraggable({
+      id: w.id,
+      disabled: !layoutMode,
+    })
     return (
       <div
         id={w.id}
         ref={setNodeRef}
-        {...(layoutMode ? listeners : {})}
-        {...attributes}
         className={
           'group relative rounded border p-2 shadow-sm outline-none ' +
           (selected ? 'border-blue-500 ' : '') +
-          (layoutMode
-            ? ' cursor-grab active:cursor-grabbing bg-white/70 dark:bg-neutral-900/70'
-            : ' bg-white/60 dark:bg-neutral-900/60')
+          (layoutMode ? ' bg-white/70 dark:bg-neutral-900/70' : ' bg-white/60 dark:bg-neutral-900/60')
         }
         style={{
           gridColumn: `${w.col_start} / span ${w.col_count}`,
@@ -262,31 +264,64 @@ export function DashboardGrid({ dashboardId }: DashboardGridProps) {
         onClick={onSelect}
         tabIndex={0}
       >
-        <div className="flex items-center justify-between">
-          <div className="text-sm font-medium">{w.title}</div>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button size="icon" variant="ghost" className="h-6 w-6">
-                <MoreHorizontal className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={onRename}>Rename</DropdownMenuItem>
-              <DropdownMenuItem onClick={onDelete} className="text-red-600">
-                Delete
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <div className="text-sm font-medium">{w.title}</div>
+          </div>
+          <div className="flex items-center gap-2">
+            {layoutMode && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="h-6 w-6 text-neutral-500 hover:text-neutral-700 dark:text-neutral-400 dark:hover:text-neutral-200"
+                  >
+                    <SettingsIcon className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={onRename}>Rename</DropdownMenuItem>
+                  <DropdownMenuItem onClick={onDelete} className="text-red-600">
+                    Delete
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+            {layoutMode && (
+              <button
+                ref={setActivatorNodeRef}
+                {...listeners}
+                type="button"
+                aria-label="Drag"
+                className="inline-flex h-5 w-5 items-center justify-center rounded text-neutral-500 hover:text-neutral-700 cursor-grab active:cursor-grabbing focus:outline-none focus:ring-1 focus:ring-neutral-400 dark:text-neutral-400 dark:hover:text-neutral-200"
+              >
+                <GripVertical className="h-4 w-4" />
+              </button>
+            )}
+          </div>
         </div>
         <div className="text-xs text-neutral-500">
           {w.col_start},{w.row_start} · {w.col_count}×{w.row_count}
         </div>
 
         {layoutMode && (
-          <div
-            className="absolute bottom-1 right-1 hidden h-3 w-3 cursor-nwse-resize rounded bg-neutral-400 group-hover:block"
+          <button
+            type="button"
+            aria-label="Resize"
+            className={cn(
+              'absolute flex cursor-nwse-resize items-center justify-center',
+              'border-t shadow-none outline-none transform -rotate-45',
+              'bottom-[0px] h-[10px] -right-[6px] w-[24px]',
+              'hover:border-dotted',
+              {
+                'border-blue-500': selected,
+                'border-t': !selected,
+              },
+            )}
             onMouseDown={(e) => {
               e.preventDefault()
+              e.stopPropagation()
               const startX = e.clientX
               const startY = e.clientY
               function onMove(ev: MouseEvent) {
@@ -299,8 +334,29 @@ export function DashboardGrid({ dashboardId }: DashboardGridProps) {
               window.addEventListener('mousemove', onMove)
               window.addEventListener('mouseup', onUp)
             }}
+            onTouchStart={(e) => {
+              e.preventDefault()
+              e.stopPropagation()
+              const touch = e.touches[0]
+              const startX = touch.clientX
+              const startY = touch.clientY
+              function onMove(ev: TouchEvent) {
+                const t = ev.touches[0]
+                onResize(t.clientX - startX, t.clientY - startY)
+              }
+              function onUp() {
+                window.removeEventListener('touchmove', onMove)
+                window.removeEventListener('touchend', onUp)
+                window.removeEventListener('touchcancel', onUp)
+              }
+              window.addEventListener('touchmove', onMove, { passive: false })
+              window.addEventListener('touchend', onUp)
+              window.addEventListener('touchcancel', onUp)
+            }}
             title="Resize"
-          />
+          >
+            <span className="sr-only">Resize</span>
+          </button>
         )}
       </div>
     )
@@ -308,12 +364,10 @@ export function DashboardGrid({ dashboardId }: DashboardGridProps) {
 
   return (
     <div className="flex h-full flex-col gap-3">
-      <div className="flex items-center justify-between">
-        <div className="text-xs text-neutral-500">
-          {layoutMode ? 'Layout mode: drag to move, use handle to resize.' : 'View mode'}
-        </div>
-        <div className="flex items-center gap-2">
-          {layoutMode && (
+      {layoutMode && (
+        <div className="flex items-center justify-between">
+          <div className="text-xs text-neutral-500">Edit mode: drag to move, use handle to resize.</div>
+          <div className="flex items-center gap-2">
             <Dialog open={open} onOpenChange={setOpen}>
               <DialogTrigger asChild>
                 <Button size="sm">Add widget</Button>
@@ -330,12 +384,9 @@ export function DashboardGrid({ dashboardId }: DashboardGridProps) {
                 </DialogFooter>
               </DialogContent>
             </Dialog>
-          )}
-          <Button size="sm" variant={layoutMode ? 'default' : 'outline'} onClick={() => setLayoutMode((v) => !v)}>
-            {layoutMode ? 'Done' : 'Layout'}
-          </Button>
+          </div>
         </div>
-      </div>
+      )}
 
       <DndContext
         modifiers={layoutMode ? [restrictToParentElement] : []}
@@ -347,6 +398,7 @@ export function DashboardGrid({ dashboardId }: DashboardGridProps) {
           className="grid gap-2"
           style={{ ...gridStyle, height: `${ROWS * CELL_PX}px` }}
           onKeyDown={(e) => {
+            if (!layoutMode) return
             if (e.key === 'ArrowLeft') {
               e.preventDefault()
               nudgeSelected(-1, 0)
@@ -359,9 +411,12 @@ export function DashboardGrid({ dashboardId }: DashboardGridProps) {
             } else if (e.key === 'ArrowDown') {
               e.preventDefault()
               nudgeSelected(0, 1)
+            } else if (e.key === 'Escape') {
+              e.preventDefault()
+              e.currentTarget.blur()
             }
           }}
-          tabIndex={0}
+          tabIndex={layoutMode ? 0 : undefined}
         >
           {widgets.map((w) => (
             <WidgetCard

@@ -8,6 +8,7 @@ function App() {
   const [dashboardId, setDashboardId] = useState<string>('')
   const [projectId, setProjectId] = useState<string>('')
   const [refresh, setRefresh] = useState(0)
+  const [layoutMode, setLayoutMode] = useState(false)
 
   const isEmpty = !projectId && !dashboardId
 
@@ -19,6 +20,8 @@ function App() {
         refresh={refresh}
         initialProjectId={projectId}
         initialDashboardId={dashboardId}
+        layoutMode={layoutMode}
+        onToggleLayout={() => setLayoutMode((v) => !v)}
       />
       <div className="flex-1 p-4">
         {isEmpty ? (
@@ -30,7 +33,7 @@ function App() {
             }}
           />
         ) : dashboardId ? (
-          <DashboardGrid dashboardId={dashboardId} />
+          <DashboardGrid dashboardId={dashboardId} layoutMode={layoutMode} />
         ) : (
           <div className="text-sm text-neutral-600">Select a project and dashboard</div>
         )}

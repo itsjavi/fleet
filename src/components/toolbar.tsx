@@ -25,10 +25,20 @@ export type ToolbarProps = {
   refresh?: number
   initialProjectId?: string
   initialDashboardId?: string
+  layoutMode?: boolean
+  onToggleLayout?: () => void
 }
 
 export function Toolbar(props: ToolbarProps) {
-  const { onProjectChange, onDashboardChange, refresh = 0, initialProjectId, initialDashboardId } = props
+  const {
+    onProjectChange,
+    onDashboardChange,
+    refresh = 0,
+    initialProjectId,
+    initialDashboardId,
+    layoutMode = false,
+    onToggleLayout,
+  } = props
   const projectsRepo = new ProjectsRepository()
   const dashboardsRepo = new DashboardsRepository()
 
@@ -149,6 +159,10 @@ export function Toolbar(props: ToolbarProps) {
           ))}
         </TabsList>
       </Tabs>
+
+      <Button size="sm" variant={layoutMode ? 'default' : 'outline'} onClick={onToggleLayout} className="shrink-0">
+        {layoutMode ? 'Done' : 'Edit'}
+      </Button>
 
       <Button variant="outline" onClick={handleAddDashboard} className="shrink-0">
         <Plus className="mr-2 h-4 w-4" /> Add
